@@ -23,5 +23,10 @@ func main() {
 			"message": "List User",
 		})
 	})
+	r.GET("/api/v1/category", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"message": "List Category",
+		})
+	})
 	r.Run(":3000")
 }
