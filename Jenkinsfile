@@ -19,7 +19,7 @@ pipeline {
             steps {
                 script {
                     echo 'Building Docker image for linux/amd64 platform...'
-                    docker.build("${DOCKER_IMAGE}:${DOCKER_TAG}","--platform linux/amd64 .")
+                    docker.build("${DOCKER_IMAGE}:${DOCKER_TAG}", "--platform linux/amd64 .")
                 }
             }
         }
@@ -27,13 +27,14 @@ pipeline {
         stage('Run Tests') {
             steps {
                 echo 'Running tests...'
+                // Add your test scripts here
             }
         }
 
         stage('Push to Docker Hub') {
             steps {
                 script {
-                    docker.withRegistry('https://index.docker.io/v1/','docker-hub-credentials') {
+                    docker.withRegistry('https://index.docker.io/v1/', 'docker-hub-credentials') {
                         docker.image("${DOCKER_IMAGE}:${DOCKER_TAG}").push()
                     }
                 }
@@ -41,37 +42,38 @@ pipeline {
         }
 
         stage('Deploy Golang to DEV') {
-            step {
+            steps {
                 script {
                     echo 'Clearing server_golang-related images and containers...'
                     sh '''
-                        docker container stop server-golang  || echo "No container named server-golang to stop"
+                        docker container stop server-golang || echo "No container named server-golang to stop"
                         docker container rm server-golang || echo "No container named server-golang to remove"
                         docker image rm ${DOCKER_IMAGE}:${DOCKER_TAG} || echo "No image ${DOCKER_IMAGE}:${DOCKER_TAG} to remove"
                     '''
 
                     echo 'Deploying to DEV environment...'
-                    sh'''
+                    sh '''
                         docker image pull ${DOCKER_IMAGE}:${DOCKER_TAG}
                         docker network create dev || echo "Network already exists"
-                        docker container run  -d --rm --name server-golang -p 3000:3000 --network dev ${DOCKER_IMAGE}:${DOCKER_TAG}
+                        docker container run -d --rm --name server-golang -p 3000:3000 --network dev ${DOCKER_IMAGE}:${DOCKER_TAG}
                     '''
                 }
             }
         }
 
-        stage('Deploy to to Production on AWS') {
-            step {
+        stage('Deploy to Production on AWS') {
+            steps {
                 script {
                     echo 'Deploying to Production...'
                     sshagent(['aws-ssh-key']) {
-                        sh'''
-                            ssh -o StrictHostkeyChecking=no ${PROD_USER}@${PROD_SERVER} << E0F
+                        sh '''
+                            ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_SERVER} << EOF
                                 docker container stop server-golang || echo "No container to stop"
                                 docker container rm server-golang || echo "No container to remove"
                                 docker image rm ${DOCKER_IMAGE}:${DOCKER_TAG} || echo "No image to remove"
                                 docker image pull ${DOCKER_IMAGE}:${DOCKER_TAG}
                                 docker container run -d --rm --name server-golang -p 3000:3000 ${DOCKER_IMAGE}:${DOCKER_TAG}
+                            EOF
                         '''
                     }
                 }
@@ -80,6 +82,8 @@ pipeline {
     }
 
     post {
-
+        always {
+            cleanWs()
+        }
     }
 }
